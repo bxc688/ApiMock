@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ApiMock - 接口 Mock 工具</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body>
+    <div id="app" v-cloak>
+        <!-- 登录页面 -->
+        <div id="login-page" v-show="!isLoggedIn">
+            <div class="login-bg-decoration login-bg-circle-1"></div>
+            <div class="login-bg-decoration login-bg-circle-2"></div>
+            <div class="login-bg-decoration login-bg-circle-3"></div>
+            <div class="login-container">
+                <div class="login-card">
+                    <div class="login-header">
+                        <div class="login-logo-mark">
+                            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                        </div>
+                        <h1 class="login-logo">ApiMock</h1>
+                        <p class="login-subtitle">轻量级接口 Mock 工具</p>
+                    </div>
+                    <div class="login-body">
+                        <div class="login-field">
+                            <span class="login-field-icon">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            </span>
+                            <input v-model="loginForm.username" type="text" placeholder="请输入用户名"
+                                   @keyup.enter="doLogin" autocomplete="username">
+                        </div>
+                        <div class="login-field">
+                            <span class="login-field-icon">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            </span>
+                            <input v-model="loginForm.password" type="password" placeholder="请输入密码"
+                                   @keyup.enter="doLogin" autocomplete="current-password">
+                        </div>
+                        <div v-if="loginError" class="login-error">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <span>{{ loginError }}</span>
+                        </div>
+                        <button class="btn-login" @click="doLogin" :disabled="loginLoading">
+                            <span v-if="loginLoading" class="login-spinner"></span>
+                            {{ loginLoading ? '登录中...' : '登 录' }}
+                        </button>
+                    </div>
+                </div>
+                <p class="login-footer">ApiMock · 接口 Mock 平台</p>
+            </div>
+        </div>
+
+        <!-- 顶部导航（登录后显示） -->
+        <header class="header" v-show="isLoggedIn">
+            <div class="header-left">
+                <h1 class="logo">ApiMock</h1>
+                <span class="subtitle">接口 Mock 工具</span>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-sm btn-danger" @click="doLogout">退出登录</button>
+            </div>
+        </header>
+
+        <!-- 主体布局：左侧项目 + 右侧内容（登录后显示） -->
+        <div class="layout" v-show="isLoggedIn">
+            <!-- 左侧项目面板 -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <svg class="sidebar-header-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <span class="sidebar-title">项目列表</span>
+                    <button class="sidebar-add-btn" @click="openCreateProject" title="新建项目">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                </div>
+                <div class="project-list">
+                    <div v-for="project in projects" :key="project.id"
+                         class="project-item"
+                         :class="{ active: currentProjectId === project.id }"
+                         @click="switchProject(project.id)">
+                        <svg class="project-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        <span class="project-name">{{ project.name }}</span>
+                        <div class="project-actions" v-if="currentProjectId === project.id">
+                            <button class="btn-icon" @click.stop="openEditProject(project)" title="编辑">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button class="btn-icon btn-icon-danger" @click.stop="confirmDeleteProject(project)"
+                                    v-if="project.id !== 1" title="删除">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="sidebar-divider"></div>
+                <div class="sidebar-menu-item" :class="{ active: currentView === 'records' }" @click="switchView('records')">
+                    <svg class="sidebar-menu-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <span class="sidebar-menu-label">请求记录</span>
+                </div>
+            </aside>
+
+            <!-- 右侧主内容区 -->
+            <main class="main-content">
+                <!-- Mock 接口页面 -->
+                <div v-if="currentView === 'apis'" class="view-content">
+                    <div class="view-header">
+                        <div class="filter-search-row">
+                            <div class="filter-item">
+                                <label class="filter-label">接口名称：</label>
+                                <input v-model="searchName" type="text" placeholder="请输入" class="filter-input">
+                            </div>
+                            <div class="filter-item">
+                                <label class="filter-label">接口路径：</label>
+                                <input v-model="searchPath" type="text" placeholder="请输入" class="filter-input">
+                            </div>
+                            <div class="filter-item filter-actions">
+                                <button class="btn btn-sm btn-primary" @click="doSearch">查询</button>
+                                <button class="btn btn-sm" @click="resetSearch">重置</button>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" @click="openCreateForm">+ 新建接口</button>
+                    </div>
+
+                    <div class="api-list">
+                        <div v-if="filteredApis.length === 0" class="empty-state">
+                            <p>暂无 Mock 接口，点击右上角「新建接口」开始</p>
+                        </div>
+                        <div v-for="api in filteredApis" :key="api.id" class="api-card" :class="{ disabled: api.enabled === 0 }">
+                            <div class="api-card-header">
+                                <span class="method-badge" :class="'method-' + api.method.toLowerCase()">{{ api.method }}</span>
+                                <span class="api-name api-name-main">{{ api.name }}</span>
+                                <span class="api-path">{{ api.path }}</span>
+                                <div class="api-card-actions">
+                                    <button class="btn btn-sm" :class="api.enabled ? 'btn-warning' : 'btn-success'"
+                                            @click="toggleApi(api)">
+                                        {{ api.enabled ? '禁用' : '启用' }}
+                                    </button>
+                                    <button class="btn btn-sm btn-primary" @click="editApi(api)">编辑</button>
+                                    <button class="btn btn-sm btn-danger" @click="deleteApi(api)">删除</button>
+                                </div>
+                            </div>
+                            <div class="api-card-body">
+                                <span class="tag tag-info" v-if="api.responseType && api.responseType !== 'static'">
+                                    类型: {{ api.responseType === 'dynamic' ? '动态' : '文件流' }}
+                                </span>
+                                <span class="tag" v-if="api.delayMs > 0">延迟 {{ api.delayMs }}ms</span>
+                                <span class="tag tag-warning" v-if="api.errorType">异常: {{ api.errorType }}</span>
+                                <span class="tag tag-info">状态码: {{ api.responseStatus }}</span>
+                                <span class="tag" v-if="api.description">{{ api.description }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 请求记录页面 -->
+                <div v-if="currentView === 'records'" class="view-content">
+                    <div class="view-header">
+                        <div class="filter-search-row">
+                            <div class="filter-item">
+                                <label class="filter-label">接口路径：</label>
+                                <input v-model="recordSearchPath" type="text" placeholder="请输入路径关键词" class="filter-input" @keyup.enter="doRecordSearch">
+                            </div>
+                            <div class="filter-item">
+                                <label class="filter-label">接口名称：</label>
+                                <input v-model="recordSearchName" type="text" placeholder="请输入名称关键词" class="filter-input" @keyup.enter="doRecordSearch">
+                            </div>
+                            <div class="filter-item filter-actions">
+                                <button class="btn btn-sm btn-primary" @click="doRecordSearch">查询</button>
+                                <button class="btn btn-sm" @click="resetRecordSearch">重置</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="record-list">
+                        <div v-if="records.length === 0" class="empty-state">
+                            <p>暂无请求记录</p>
+                        </div>
+                        <div v-for="record in records" :key="record.id" class="record-card" :class="{ 'record-matched': record.matched === 1 }">
+                            <div class="record-header">
+                                <span class="method-badge" :class="'method-' + record.method.toLowerCase()">{{ record.method }}</span>
+                                <span class="api-path">{{ record.path }}</span>
+                                <span class="record-status" :class="record.matched ? 'status-matched' : 'status-unmatched'">
+                                    {{ record.matched ? '已匹配' : '未匹配' }}
+                                </span>
+                                <span class="record-ip" v-if="record.clientIp">IP: {{ record.clientIp }}</span>
+                                <span class="record-time">{{ formatTime(record.createdAt) }}</span>
+                            </div>
+                            <div v-if="record.responseStatus" class="record-body">
+                                <span class="tag">响应: {{ record.responseStatus }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 分页 -->
+                    <div v-if="recordTotal > 0" class="pagination">
+                        <button class="btn btn-sm" :disabled="recordPage <= 1" @click="recordPage--; loadRecords()">上一页</button>
+                        <button class="btn btn-sm" :disabled="recordPage >= recordTotalPages" @click="recordPage++; loadRecords()">下一页</button>
+                        <span class="pagination-info">第 {{ recordPage }} / {{ recordTotalPages }} 页，共 {{ recordTotal }} 条</span>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+
+        <!-- 创建/编辑接口弹窗 -->
+        <div v-if="showCreateForm || showEditForm" class="modal-overlay" @click.self="closeForm">
+            <div class="modal modal-lg">
+                <div class="modal-header">
+                    <h2>{{ showEditForm ? '编辑接口' : '新建接口' }}</h2>
+                    <button class="btn-close" @click="closeForm">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group form-group-lg">
+                            <label>接口名称 <span class="required">*</span></label>
+                            <input v-model="formData.name" type="text" placeholder="如：获取用户列表" class="form-input">
+                        </div>
+                        <div class="form-group form-group-md">
+                            <label>请求方法</label>
+                            <select v-model="formData.method" class="form-input">
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="PATCH">PATCH</option>
+                                <option value="HEAD">HEAD</option>
+                                <option value="OPTIONS">OPTIONS</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>请求路径 <span class="required">*</span></label>
+                        <input v-model="formData.path" type="text" placeholder="/api/user/list" class="form-input">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group form-group-sm">
+                            <label>响应状态码</label>
+                            <input v-model.number="formData.responseStatus" type="number" class="form-input">
+                        </div>
+                        <div class="form-group form-group-sm">
+                            <label>响应类型</label>
+                            <select v-model="formData.responseType" class="form-input">
+                                <option value="static">静态文本</option>
+                                <option value="dynamic">动态响应</option>
+                                <option value="file">文件流</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-sm">
+                            <label>延迟 (ms)</label>
+                            <input v-model.number="formData.delayMs" type="number" placeholder="0" class="form-input">
+                        </div>
+                        <div class="form-group form-group-sm">
+                            <label>异常类型</label>
+                            <select v-model="formData.errorType" class="form-input">
+                                <option value="">无</option>
+                                <option value="timeout">超时</option>
+                                <option value="500">服务器错误</option>
+                                <option value="404">未找到</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 静态模式：显示响应头和响应体 -->
+                    <div v-if="formData.responseType === 'static'">
+                        <div class="form-group">
+                            <label>响应头 (JSON)</label>
+                            <textarea v-model="formData.responseHeaders" rows="2" placeholder='{"Content-Type": "application/json"}' class="form-input form-textarea"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>响应体</label>
+                            <textarea v-model="formData.responseBody" rows="10"
+                                :placeholder="responseBodyPlaceholder"
+                                class="form-input form-textarea form-textarea-lg"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 动态模式：规则编辑器 -->
+                    <div v-if="formData.responseType === 'dynamic'">
+                        <div class="form-group">
+                            <label>响应规则 <span class="tag tag-info" style="font-size:11px;">根据请求参数值返回不同响应</span></label>
+                        </div>
+                        <div v-for="(rule, index) in formData.dynamicRules" :key="index" class="rule-row">
+                            <div class="rule-row-header">
+                                <span class="rule-index">规则 {{ index + 1 }}</span>
+                                <label class="rule-default-label">
+                                    <input type="checkbox" v-model="rule.isDefault" @change="onDefaultChange(index)">
+                                    默认规则
+                                </label>
+                                <button type="button" class="btn btn-sm btn-danger" @click="removeRule(index)" v-if="formData.dynamicRules.length > 1">删除</button>
+                            </div>
+                            <div class="rule-row-body" v-if="!rule.isDefault">
+                                <div class="rule-field-row">
+                                    <div class="rule-field">
+                                        <label>条件字段名</label>
+                                        <input v-model="rule.conditionField" type="text" placeholder="如：工程阶段" class="form-input">
+                                    </div>
+                                    <div class="rule-field">
+                                        <label>条件值</label>
+                                        <input v-model="rule.conditionValue" type="text" placeholder="如：设计阶段" class="form-input">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="rule-field-row">
+                                <div class="rule-field rule-field-lg">
+                                    <label>响应体</label>
+                                    <textarea v-model="rule.responseBody" rows="6" placeholder='{"code":200,"data":{}}' class="form-input form-textarea form-textarea-lg"></textarea>
+                                </div>
+                            </div>
+                            <div class="rule-row-divider"></div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-primary" @click="addRule" style="margin-top:8px;">+ 添加规则</button>
+                    </div>
+
+                    <!-- 文件流模式：显示文件上传和 Content-Type -->
+                    <div v-if="formData.responseType === 'file'">
+                        <div class="form-group">
+                            <label>上传文件</label>
+                            <div class="file-upload-area">
+                                <input type="file" ref="fileInput" @change="handleFileUpload" class="file-input" accept="*/*">
+                                <button type="button" class="btn btn-sm btn-primary" @click="$refs.fileInput.click()">选择文件</button>
+                                <span v-if="uploading" class="upload-status">上传中...</span>
+                                <span v-if="formData.responseFilePath && !uploading" class="upload-status upload-success">
+                                    已上传: {{ uploadedFileName || extractFileName(formData.responseFilePath) }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Content-Type</label>
+                            <input v-model="formData.responseContentType" type="text" placeholder="如：application/pdf、image/png（留空自动推断）" class="form-input">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>备注</label>
+                        <input v-model="formData.description" type="text" placeholder="可选" class="form-input">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" @click="closeForm">取消</button>
+                    <button class="btn btn-primary" @click="saveApi">{{ showEditForm ? '保存' : '创建' }}</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 新建项目弹窗 -->
+        <div v-if="showCreateProjectForm" class="modal-overlay" @click.self="showCreateProjectForm = false">
+            <div class="modal modal-sm">
+                <div class="modal-header">
+                    <h2>新建项目</h2>
+                    <button class="btn-close" @click="showCreateProjectForm = false">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>项目名称 <span class="required">*</span></label>
+                        <input v-model="newProjectName" type="text" placeholder="请输入" class="form-input"
+                               @keyup.enter="createProject">
+                    </div>
+                    <div class="form-group">
+                        <label>备注（可选）</label>
+                        <input v-model="newProjectDesc" type="text" placeholder="项目描述" class="form-input"
+                               @keyup.enter="createProject">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" @click="showCreateProjectForm = false">取消</button>
+                    <button class="btn btn-primary" @click="createProject">创建</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast 提示 -->
+        <div v-if="toast.show" class="toast" :class="'toast-' + toast.type">
+            {{ toast.message }}
+        </div>
+
+        <!-- 编辑项目弹窗 -->
+        <div v-if="showEditProjectForm" class="modal-overlay" @click.self="showEditProjectForm = false">
+            <div class="modal modal-sm">
+                <div class="modal-header">
+                    <h2>编辑项目</h2>
+                    <button class="btn-close" @click="showEditProjectForm = false">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>项目名称 <span class="required">*</span></label>
+                        <input v-model="editingProjectName" type="text" placeholder="请输入" class="form-input"
+                               @keyup.enter="saveEditProject">
+                    </div>
+                    <div class="form-group">
+                        <label>备注（可选）</label>
+                        <input v-model="editingProjectDesc" type="text" placeholder="项目描述" class="form-input"
+                               @keyup.enter="saveEditProject">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" @click="showEditProjectForm = false">取消</button>
+                    <button class="btn btn-primary" @click="saveEditProject">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 确认弹窗 -->
+        <div v-if="confirmDialog.show" class="modal-overlay" @click.self="confirmDialog.show = false">
+            <div class="modal modal-sm">
+                <div class="modal-header">
+                    <h2>{{ confirmDialog.title || '确认' }}</h2>
+                    <button class="btn-close" @click="confirmDialog.show = false">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>{{ confirmDialog.message }}</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" @click="confirmDialog.show = false">取消</button>
+                    <button class="btn btn-danger" @click="confirmDialog.onConfirm(); confirmDialog.show = false">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

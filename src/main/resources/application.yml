@@ -1,0 +1,30 @@
+server:
+  port: 8008
+
+spring:
+  datasource:
+    url: jdbc:sqlite:file:./data/apimock.db?mode=rwc
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 5
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.apimock.model.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    com.apimock: DEBUG
+
+# IP 白名单：true=仅白名单内的 IP 可调用 Mock 接口（改完需重启服务）
+# list 为逗号分隔的 IP 列表，支持单 IP（192.168.1.100）和 CIDR 网段（192.168.1.0/24）
+apimock:
+  ip-whitelist:
+    enabled: true
+    list: "127.0.0.1,10.1.17.68"
